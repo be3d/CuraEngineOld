@@ -34,6 +34,7 @@ private:
     int zPos;
     bool isRetracted;
     int extruderNr;
+    vector<int> extruderUsed;
     int currentFanSpeed;
     int flavor;
     std::string preSwitchExtruderCode;
@@ -88,6 +89,8 @@ public:
     void writeMove(Point p, int speed, int lineWidth);
     
     void writeRetraction();
+
+    void writeReturnOfNotLastExtruders();
     
     void switchExtruder(int newExtruder);
     

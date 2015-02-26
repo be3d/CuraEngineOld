@@ -1,6 +1,7 @@
 /** Copyright (C) 2013 David Braam - Released under terms of the AGPLv3 License */
 #include <stdarg.h>
 #include <stdio.h>
+#include <algorithm>
 
 #include "gcodeExport.h"
 #include "pathOrderOptimizer.h"
@@ -305,10 +306,37 @@ void GCodeExport::writeRetraction()
     }
 }
 
+void GCodeExport::writeReturnOfNotLastExtruders()
+{
+
+    if(extruderUsed.size() < 2 || extruderSwitchReturn <= 0.0)
+    {
+        return;
+    }
+    for(std::vector<int>::iterator it = extruderUsed.begin(); it < extruderUsed.end(); ++it)
+    {
+        if(extruderNr == *it)
+        {
+            continue;
+        }
+        resetExtrusionValue();
+        fprintf(f, "T%i\n", *it);
+        fprintf(f, "G1 F%i %c%0.5f\n", retractionSpeed * 60, extruderCharacter[*it], extruderSwitchReturn);
+    }
+
+    fprintf(f, "T%i\n", extruderNr);
+}
+
 void GCodeExport::switchExtruder(int newExtruder)
 {
     if (extruderNr == newExtruder)
         return;
+    std::vector<int>::iterator it = std::find(extruderUsed.begin(), extruderUsed.end(), extruderNr);
+    if (it == extruderUsed.end())
+    {
+        extruderUsed.push_back(extruderNr);
+    }
+
     if (flavor == GCODE_FLAVOR_BFB)
     {
         if (!isRetracted)
@@ -336,7 +364,7 @@ void GCodeExport::switchExtruder(int newExtruder)
         fprintf(f, "M135 T%i\n", extruderNr);
     else
         fprintf(f, "T%i\n", extruderNr);
-    if (this->extruderSwitchReturn > 0.0)
+    if (extruderSwitchReturn > 0.0)
     {
       extrusionAmount += extruderSwitchReturn;
     }
@@ -386,10 +414,12 @@ void GCodeExport::tellFileSize() {
 
 void GCodeExport::finalize(int maxObjectHeight, int moveSpeed, const char* endCode)
 {
+
     writeFanCommand(0);
     writeRetraction();
     setZ(maxObjectHeight + 5000);
     writeMove(getPositionXY(), moveSpeed, 0);
+    writeReturnOfNotLastExtruders();
     writeCode(endCode);
     cura::log("Print time: %d\n", int(getTotalPrintTime()));
     cura::log("Filament: %d\n", int(getTotalFilamentUsed(0)));
